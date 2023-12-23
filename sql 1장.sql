@@ -83,14 +83,14 @@ SELECT empno, ename, sal FROM emp WHERE sal >=4000;
 SELECT empno, ename, sal FROM emp WHERE ename>='W';
 -- 날짜는 최근 날짜가 큰 날짜, 이전 날짜일수록 작은 날짜
 SELECT ename, hiredate FROM emp WHERE hiredate >= '81/12/25';
--- between으로 구간 데이터 조회(이상 이하)
+-- between : 구간 데이터 조회(이상 이하)
 SELECT empno, ename, sal FROM emp WHERE sal between 2000 and 3000;
 -- 특정 구간 값을 검색할 때 between보다는 비교연산자를 권장
 SELECT empno, ename, sal FROM emp WHERE sal >= 2000 and sal <= 3000;
 SELECT ename FROM emp WHERE ename BETWEEN 'JAMES' and 'MARTIN' ORDER BY ename;
--- in 연산자로 여러 조건 간편하게 검색
+-- in : 여러 조건 간편하게 검색
 SELECT empno, ename, deptno FROM emp WHERE deptno IN (10, 20);
--- like 연산자로 비슷한 것들 모두 찾기
+-- like : 비슷한 것들 모두 찾기
 -- % : 글자 수에 제한이 없고(0개 포함) 어떤 글자가 와도 상관 없음
 -- _ : 글자 수는 한글자만 올 수 있고 어떤 글자가 와도 상관 없음
 SELECT empno, ename, hiredate FROM emp;
@@ -128,3 +128,15 @@ minus : 두 집합의 차집합 결과를 출력 및 정렬, 쿼리의 순서가 중요
 2. 두 집합의 select 절에 오는 컬럼의 데이터 형이 동일해야 함
 3. 두 집합의 컬럼명은 달라도 상관없음
 */
+-- union, union all : 두 select로 나온 결과를 더함, union으로 많이 연결할 수록 sql 성능 아주 많이 떨어짐
+SELECT * FROM student;
+SELECT * FROM professor;
+SELECT name, deptno1, 1 FROM student UNION SELECT name, deptno, 2 FROM professor;
+SELECT studno, name, deptno1, 1 FROM student WHERE deptno1 = 101 UNION SELECT profno, name, deptno, 2 FROM professor WHERE deptno = 101;
+SELECT studno, name, deptno1, 1 FROM student WHERE deptno1 = 101 UNION ALL SELECT profno, name, deptno, 2 FROM professor WHERE deptno = 101;
+-- intersect : 교집합 찾아내는 연산자
+SELECT studno, name, deptno1, 1 FROM student WHERE deptno1 = 101 INTERSECT SELECT profno, name, deptno, 2 FROM professor WHERE deptno = 201;
+-- minus : 큰 집합에서 작은 집합을 뺌
+-- emp 테이블에서 직원들의 급여를 인상하기 위한 명단 출력, 급여가 2500이하인 사람만.
+-- 큰 결과를 가진 select minus 작은 결과를 가진 select. 컬럼의 수와 데이터타입을 동일하게.
+SELECT empno, ename, sal FROM emp MINUS SELECT empno, ename, sal FROM emp WHERE sal > 2500;
