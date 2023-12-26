@@ -174,6 +174,70 @@ SELECT empno, ename, comm, NVL2(comm, 'Exist', 'NULL') "NVL2" FROM emp WHERE dep
 -- DECODE(A, B, '1', null) : a가 b일 경우 1을 출력, 아니라면 null을 출력
 SELECT deptno, name, DECODE(deptno, 101, 'Computer Engineering') "DNAME" FROM professor;
 SELECT deptno, name, DECODE(deptno, 101, 'Computer Engineering', 'ETC') "DNAME" FROM professor;
--- DECODE(A, B, '1', C, '2', '3') : A가 B일 경우 1, A가 C일 경우 2를 출력, 아니면 3을 출력
--- DECODE(A, B, DECODE(C, D, '1', null)) : A가 B일 경우 중 C가 D를 만족하면 1을 출력, 아닐경우 null을 출력
 SELECT deptno, name, DECODE(deptno, 101, DECODE(name, 'Audie Murphy', 'BEST!')) "ETC" FROM professor;
+SELECT deptno, name, DECODE(deptno, 101, DECODE(name, 'Audie Murphy', 'BEST!', 'GOOD!')) "ETC" FROM professor;
+SELECT deptno, name, DECODE(deptno, 101, DECODE(name, 'Audie Murphy', 'BEST!', 'GOOD!'), 'N/A') "ETC" FROM professor;
+
+SELECT name, jumin, DECODE(SUBSTR(jumin, 7, 1), '1', 'MAN', 'WOMAN') "GENDER" FROM student WHERE deptno1=101;
+SELECT name, tel, DECODE(SUBSTR(tel, 1 , INSTR(tel, ')')-1), '02', 'SEOUL', '031', 'GYEONGGI', '051', 'BUSAN', '052', 'ULSAN', '055', 'GYEONGNAM') "LOC" FROM student WHERE deptno1=101;
+
+-- CASE : 크거나 작은 조건을 처리할 경우 사용. 콤마를 사용하지 않는다
+SELECT name, tel, SUBSTR(jumin, 3, 2) "MONTH", CASE 
+WHEN SUBSTR(jumin, 3, 2) BETWEEN '01' AND '03' THEN '1/4'
+WHEN SUBSTR(jumin, 3, 2) BETWEEN '04' AND '06' THEN '2/4'
+WHEN SUBSTR(jumin, 3, 2) BETWEEN '07' AND '09' THEN '3/4'
+WHEN SUBSTR(jumin, 3, 2) BETWEEN '10' AND '12' THEN '4/4'
+END "Quarter" FROM student;
+SELECT empno, ename, sal, CASE
+WHEN sal BETWEEN 1 AND 1000 THEN 'LEVEL 1'
+WHEN sal BETWEEN 1001 AND 2000 THEN 'LEVEL 2'
+WHEN sal BETWEEN 2001 AND 3000 THEN 'LEVEL 3'
+WHEN sal BETWEEN 3001 AND 4000 THEN 'LEVEL 4'
+WHEN sal >= 4001 THEN 'LEVEL 5'
+END "LEVEL" FROM emp;
+
+-- 정규식(Regular Expression) 함수로 다양한 조건 조회하기
+/*
+^(캐럿) : 해당 문자로 시작하는 line 출력 
+$ : 해당 문자로 끝나는 line 출력
+. : 무언가로 시작해서 무언가로 끝나는 line 출력 s...e -> s로 시작해서 e로 끝나는
+* : 모든. 글자수가 0일 수도 있음
+[] : 해당 문자에 해당하는 한 문자 [Pp]attern
+[^] : 해당 문자에 해당하지 않는 한 문자 [^a-m]attern
+*/
+select * from t_reg;
+
+-- REGEXP_LIKE : 특정 패턴과 매칭되는 결과를 검색
+-- 영문자가 들어있는 행만 출력
+SELECT * FROM t_reg WHERE REGEXP_LIKE(text, '[a-z]');
+SELECT * FROM t_reg WHERE REGEXP_LIKE(text, '[A-Z]');
+SELECT * FROM t_reg WHERE REGEXP_LIKE(text, '[a-zA-Z]');
+
+-- 소문자로 시작하고 공백을 포함하는 경우 찾기
+SELECT * FROM t_reg WHERE REGEXP_LIKE(text, '[a-z] ');
+SELECT * FROM t_reg WHERE REGEXP_LIKE(text, '[a-z] [0-9]');
+-- 공백이 있는 데이터 전부 찾기
+SELECT * FROM t_reg WHERE REGEXP_LIKE(text, '[[:space:]]');
+-- 연속적인 글자 수 지정
+SELECT * FROM t_reg WHERE REGEXP_LIKE(text, '[A-Z]{2}'); -- 영 대문자 2글자 이상
+SELECT * FROM t_reg WHERE REGEXP_LIKE(text, '[A-Z]{3}'); -- 영 대문자 3글자 이상
+SELECT * FROM t_reg WHERE REGEXP_LIKE(text, '[A-Z]{4}'); -- 영 대문자 4글자 이상
+SELECT * FROM t_reg WHERE REGEXP_LIKE(text, '[0-9]{3}'); -- 숫자 3글자 이상
+SELECT * FROM t_reg WHERE REGEXP_LIKE(text, '[A-Z][0-9]{3}'); -- 숫자 3글자 이상
+SELECT * FROM t_reg WHERE REGEXP_LIKE(text, '[0-9][A-Z]{3}'); -- 숫자 3글자 이상
+-- 대문자가 들어가는 경우를 출력
+SELECT * FROM t_reg WHERE REGEXP_LIKE(text, '[[:upper:]]');
+-- 특정 위치를 지정하여 출력
+SELECT  * FROM t_reg WHERE REGEXP_LIKE(text, '^[A-Za-z]'); -- 첫 시작을 대문자나 소문자로 시작하는 경우를 출력
+SELECT  * FROM t_reg WHERE REGEXP_LIKE(text, '^[0-9A-Z]'); -- 첫 시작을 숫자나 대문자로 시작하는 경우를 출력
+SELECT  * FROM t_reg WHERE REGEXP_LIKE(text, '^[a-z]|^[0-9]'); -- 첫 시작을 소문자나 숫자로 시작하는 경우를 출력
+SELECT name, id FROM student WHERE REGEXP_LIKE(id, '^M(a|o)'); -- id 중 첫 글자가 M으로 시작하고 두번째 글자가 a또는 o가 오는 경우를 출력
+ -- 영문자로 끝나는 경우를 출력
+SELECT * FROM t_reg WHERE REGEXP_LIKE(text, '[a-zA-Z]$');
+SELECT * FROM t_reg WHERE REGEXP_LIKE(text, '[[:alpha:]]$');
+-- ^(캐럿)이 대괄호 안에 들어가면 대괄호 안의 문자 이외 것만 출력
+SELECT * FROM t_reg WHERE REGEXP_LIKE(text, '^[^a-z]'); -- 소문자로 시작하지않는 경우를 출력
+SELECT * FROM t_reg WHERE REGEXP_LIKE(text, '^[^0-9]'); -- 숫자로 시작하지않는 경우를 출력
+SELECT * FROM t_reg WHERE REGEXP_LIKE(text, '^[^0-9a-z]'); -- 소문자나 숫자로 시작하지않는 경우를 출력
+-- 소문자가 들어있는 경우를 제외하고 출력
+SELECT * FROM t_reg WHERE NOT REGEXP_LIKE(text, '[a-z]');
