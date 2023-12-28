@@ -19,7 +19,7 @@ rpad : 주어진 문자열에서 오른쪽으로 특정 문자를 채움 rpad('love', 10, '#') -> 10
 ltrim : 주어진 문자열에서 왼쪽의 특정 문자를 삭제 ltrim('###love','#') -> ###love의 왼쪽에서 #를 삭제. love
 rtrim : 주어진 문자열에서 오른쪽쪽의 특정 문자를 삭제 rtrim('love###','#') -> love###의 오른쪽에서 #를 삭제. love
 replace : 주어진 문자열에서 a를 b로 치환 replace('abcd', 'a', 'b') -> bbcd
-regexp_eplace : 주어진 문자열에서 특정 패턴을 찾아 치환
+regexp_replace : 주어진 문자열에서 특정 패턴을 찾아 치환
 regexp_instr : 주어진 문자열에서 특정 패턴의 시작 위치를 반환
 regexp_substr : 주어진 문자열에서 특정 패턴을 찾아 반환
 regexp_like : 주어진 문자열에서 특정 패턴을 찾아 반환
