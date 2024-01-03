@@ -73,8 +73,173 @@ select * from professor2 ORDER BY deptno, position;
 -- deptno별로 먼저 분류 후 같은 position이 있을 경우 position별로 pay소계값을 구하기
 SELECT deptno, position, SUM(pay) FROM professor2 GROUP BY deptno, ROLLUP(position);
 
+explain plan for 
+SELECT deptno, NULL job, ROUND(AVG(sal),1), COUNT(*) FROM emp GROUP BY deptno 
+UNION ALL 
+SELECT NULL deptno, job, ROUND(AVG(sal),1), COUNT(*) FROM emp GROUP BY job 
+UNION ALL 
+SELECT deptno, job, ROUND(AVG(sal),1), COUNT(*) FROM emp GROUP BY deptno, job 
+UNION ALL 
+SELECT NULL deptno, NULL job, ROUND(AVG(sal),1), COUNT(*) FROM emp ORDER BY deptno, job;
+col PLAN_TABLE_OUTPUT format a80
+select * from table(dbms_xplan.display);
 -- cube : 소계와 전체 합계까지 출력. 컬럼 순서가 바뀌어도 출력물은 같음
 explain plan for
 SELECT deptno, job, ROUND(AVG(sal),1) avg_sal, COUNT(*) cnt_emp FROM emp GROUP BY CUBE(deptno, job) ORDER BY deptno, job;
 col PLAN_TABLE_OUTPUT format a80
-select * from table(dbms_xplan.display); -- 왜 안돼??
+select * from table(dbms_xplan.display); -- 안되는 것 같은데...흠
+
+-- grouping sets : grouping 조건이 여러 개일 경우 사용
+/*
+student테이블에서 학년별로 학생들의 인원 수 합계와 학과별 인원 수의 합계를 구해야 하는 경우
+기존에는 학년별로 인원 수 합계를 구하고 별도로 학과별 인원 수 합계를 구한 후 union해야 했음
+*/
+SELECT grade, COUNT(*) FROM student GROUP BY grade
+UNION SELECT deptno1, COUNT(*) FROM student GROUP BY deptno1;
+-- grouping sets 사용
+SELECT grade, deptno1, COUNT(*) FROM student GROUP BY GROUPING SETS(grade, deptno1);
+-- student 테이블에서 학년별, 학괍ㄹ로 인원수와 키의 합계 몸무게의 합계 동시 출력
+SELECT grade, deptno1, COUNT(*), SUM(height), SUM(weight) FROM student GROUP BY GROUPING SETS(grade, deptno1);
+
+-- listagg : 쉽게 grouping 해줌. 4000바이트가 넘으면 오류 발생. 그 경우 XMLAGG XML 사용
+-- 나열하고 싶은 컬럼을 적고 데이터들을 구분할 구분자를 '' 사이에 기록. WITHIN GROUP에 가로로 나열하고 싶은 규칙을 ORDER BY로 기록.
+SET line 200
+COL LISTAGG FOR a50
+SELECT deptno, LISTAGG(ename, '->') WITHIN GROUP(ORDER BY hiredate) "LISTAGG" FROM emp GROUP BY deptno;
+-- xmlagg xml : 데이터를 내부적으로 xml형태로 만듦. varchar2, clob형태가 있음
+--                          xml 태그명(임의), 구분자, 대상 컬럼명                          varchar2일 때 getStringVal
+SELECT deptno, SUBSTR(XMLAGG(XMLELEMENT(X, ',', ename) ORDER BY ename).EXTRACT('//text()').getStringVal(), 2) 
+AS DEPT_ENAME_LIST FROM emp A GROUP BY deptno;
+--                          xml 태그명(임의), 구분자, 대상 컬럼명                          clob일 때 getClobVal
+SELECT deptno, SUBSTR(XMLAGG(XMLELEMENT(X, ',', ename) ORDER BY ename).EXTRACT('//text()').getClobVal(), 2) 
+AS DEPT_ENAME_LIST FROM emp A GROUP BY deptno;
+
+-- pivot : row단위를 column으로, unpivot : column단위를 row로 변경
+select * from cal;
+-- pivot 기능을 사용하지 않고 decode 함수를 활용하여 달력 만들기
+-- 기본 조회
+SELECT
+DECODE(day, 'SUN', dayno) SUN, 
+DECODE(day, 'MON', dayno) MON, 
+DECODE(day, 'TUE', dayno) TUE, 
+DECODE(day, 'WED', dayno) WED, 
+DECODE(day, 'THU', dayno) THU, 
+DECODE(day, 'FRI', dayno) FRI, 
+DECODE(day, 'SAT', dayno) SAT 
+FROM cal;
+-- 데이터가 문자로 되어있어서 아스키코드로 변경되어 비교되는데 두글자 이상일 경우 가장 앞 글자만 변환해서 비교함
+SELECT
+MAX(DECODE(day, 'SUN', dayno)) SUN, 
+MAX(DECODE(day, 'MON', dayno)) MON, 
+MAX(DECODE(day, 'TUE', dayno)) TUE, 
+MAX(DECODE(day, 'WED', dayno)) WED, 
+MAX(DECODE(day, 'THU', dayno)) THU, 
+MAX(DECODE(day, 'FRI', dayno)) FRI, 
+MAX(DECODE(day, 'SAT', dayno)) SAT
+FROM cal;
+-- weekno로 grouping, 정렬되지 않은 채 출력
+SELECT
+MAX(DECODE(day, 'SUN', dayno)) SUN, 
+MAX(DECODE(day, 'MON', dayno)) MON, 
+MAX(DECODE(day, 'TUE', dayno)) TUE, 
+MAX(DECODE(day, 'WED', dayno)) WED, 
+MAX(DECODE(day, 'THU', dayno)) THU, 
+MAX(DECODE(day, 'FRI', dayno)) FRI, 
+MAX(DECODE(day, 'SAT', dayno)) SAT
+FROM cal
+GROUP BY weekno;
+-- ORDER BY로 정렬
+COL sun FOR a4
+COL mon FOR a4
+COL tue FOR a4
+COL wed FOR a4
+COL thu FOR a4
+COL fri FOR a4
+COL sat FOR a4
+SELECT
+MAX(DECODE(day, 'SUN', dayno)) SUN, 
+MAX(DECODE(day, 'MON', dayno)) MON, 
+MAX(DECODE(day, 'TUE', dayno)) TUE, 
+MAX(DECODE(day, 'WED', dayno)) WED, 
+MAX(DECODE(day, 'THU', dayno)) THU, 
+MAX(DECODE(day, 'FRI', dayno)) FRI, 
+MAX(DECODE(day, 'SAT', dayno)) SAT
+FROM cal
+GROUP BY weekno ORDER BY weekno;
+
+-- pivot 기능을 사용하여 달력 만들기
+/*
+PIVOT 절에 MAX(dayno) 절은 DECODE 문장에서 사용되는 함수를,
+FOR 절에는 화면에 집계될 grouping할 컬럼을 작성.
+IN 연산자 뒤에는 서브쿼리 사용 불가
+*/
+COL week FOR a4
+SELECT * FROM (SELECT weekno "WEEK", day, dayno FROM cal)
+PIVOT(MAX(dayno) FOR day IN (
+'SUN' AS "SUN", 
+'MON' AS "MON", 
+'TUE' AS "TUE", 
+'WED' AS "WED", 
+'THU' AS "THU", 
+'FRI' AS "FRI", 
+'SAT' AS "SAT" )) ORDER BY "WEEK";
+
+-- emp 테이블에서 부서별로 각 직급별 인원이 몇 명인지 계산하기
+-- 단계별로 살펴보자
+COL CLERK FOR a8
+COL MANAGER FOR a8
+COL PRESIDENT FOR a8
+COL ANALYST FOR a8
+COL SALESMAN FOR a8
+SELECT deptno,
+DECODE(job, 'CLERK', '0') "CLERK",
+DECODE(job, 'MANAGER', '0') "MANAGER",
+DECODE(job, 'PRESIDENT', '0') "PRESIDENT",
+DECODE(job, 'ANALYST', '0') "ANALYST",
+DECODE(job, 'SALESMAN', '0') "SALESMAN"
+FROM emp;
+-- 0이 부서의 직급별로 몇 개인지
+SELECT deptno, 
+COUNT(DECODE(job, 'CLERK', '0')) "CLERK", 
+COUNT(DECODE(job, 'MANAGER', '0')) "MANAGER", 
+COUNT(DECODE(job, 'PRESIDENT', '0')) "PRESIDENT", 
+COUNT(DECODE(job, 'ANALYST', '0')) "ANALYST", 
+COUNT(DECODE(job, 'SALESMAN', '0')) "SALESMAN"
+FROM emp GROUP BY deptno;
+-- ORDER BY로 정렬
+SELECT deptno, 
+COUNT(DECODE(job, 'CLERK', '0')) "CLERK", 
+COUNT(DECODE(job, 'MANAGER', '0')) "MANAGER", 
+COUNT(DECODE(job, 'PRESIDENT', '0')) "PRESIDENT", 
+COUNT(DECODE(job, 'ANALYST', '0')) "ANALYST", 
+COUNT(DECODE(job, 'SALESMAN', '0')) "SALESMAN"
+FROM emp GROUP BY deptno ORDER BY deptno;
+
+-- unpivot : 합쳐져 있는 것을 풀어서 보여주는 역할
+CREATE TABLE upivot AS 
+SELECT * FROM 
+(
+    SELECT deptno, job, empno FROM emp
+)
+PIVOT
+(
+    COUNT(empno) 
+    FOR job IN (
+        'CLERK' AS "CLERK",
+        'MANAGER' AS "MANAGER",
+        'PRESIDENT' AS "PRESIDENT",
+        'ANALYST' AS "ANALYST",
+        'SALESMAN' AS "SALESMAN"
+    )
+);
+SELECT * FROM upivot;
+SELECT * FROM upivot
+UNPIVOT(
+empno FOR job IN (CLERK, MANAGER, PRESIDENT, ANALYST, SALESMAN));
+
+-- lag : 이전 행 값을 가져올 때 사용
+
+
+
+
+commit;
