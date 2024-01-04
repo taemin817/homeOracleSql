@@ -237,9 +237,84 @@ SELECT * FROM upivot
 UNPIVOT(
 empno FOR job IN (CLERK, MANAGER, PRESIDENT, ANALYST, SALESMAN));
 
--- lag : 이전 행 값을 가져올 때 사용
+-- lag : 이전의 값을 가져올 때 사용
+--                                         Query_partition : 옵션, 데이터를 파티션화하여 파티션 내에서 LAG를 계산할 수 있다
+-- LAG(출력할 컬럼명, OFFSET, 기본 출력값) OVER(Query_partition, ORDER BY 정렬할 컬럼)
+--                 OFFSET : 현재 행으로부터 얼마나 떨어진 이전 행의 값을 가져올지
+SELECT ename, hiredate, sal, LAG(sal, 1, 0) OVER(ORDER BY hiredate) "LAG" FROM emp;
 
+-- lead : 이후의 값을 가져올 때 사용, 문법이나 사용법은 lag와 동일하지만 offset 값이 가장 마지막에 보임
+SELECT ename, hiredate, sal, LEAD(sal, 1, 0) OVER (ORDER BY hiredate) "LEAD" FROM emp;
 
+/*
+rank : 순위 출력, 주어진 컬럼 값의 그룹에서 값의 순위를 계산 후 순위를 출력
+같은 순위를 가지는 순위 기준에 대해서는 같은 출력 값이기 때문에 출력 결과가 연속하지 않을 수 있음
+rank 뒤에 나오는 데이터와 order by 뒤에 나오는 데이터는 같은 컬럼이어야함
+*/
+-- 특정 데이터의 순위 확인 : RANK(조건값) WITHIN GROUP (ORDER BY 조건 컬럼명 [ASC / DESC])
+SELECT RANK('SMITH') WITHIN GROUP (ORDER BY ename) "RANK" FROM emp;
+select ename from emp order by ename;
+-- 전체 순위 확인 : RANK() OVER (ORDER BY 조건 컬럼명 [ASC / DESC])
+SELECT empno, ename, sal, 
+RANK() OVER (ORDER BY sal) AS RANK_ASC, 
+RANK() OVER (ORDER BY sal DESC) AS RANK_DESC FROM emp;
+SELECT empno, ename, sal, RANK() OVER (ORDER BY sal DESC) "RANK" FROM emp WHERE deptno=10;
+SELECT empno, ename, sal, deptno, RANK() OVER (PARTITION BY deptno ORDER BY sal DESC) "RANK" FROM emp;
+SELECT empno, ename, sal, deptno, job, RANK() OVER (PARTITION BY deptno, job ORDER BY sal DESC) "RANK" FROM emp;
 
+-- dense_rank : 동일한 순위를 하나의 건수로 취급하여 연속도니 순위를 보여줌
+SELECT empno, ename, sal, RANK() OVER(ORDER BY sal DESC) sal_rank, DENSE_RANK() OVER(ORDER BY sal DESC) sal_dense_rank FROM emp;
+
+-- row_number : 동일한 값이라도 고유한 순위를 부여, oracle => rowid가 작은 값에 먼저 순위를 부여. p.203, 204 참고
+SELECT empno, ename, job, sal, 
+RANK() OVER (ORDER BY sal DESC) sal_rank,
+DENSE_RANK() OVER (ORDER BY sal DESC) sal_dense_rank,
+ROW_NUMBER() OVER (ORDER BY sal DESC) sal_row_num FROM emp;
+-- 부서번호가 10, 20인 사원에서 부서별로 급여가 낮은 순으로 순위 부여하기
+SELECT deptno, sal, empno, 
+RANK() OVER(PARTITION BY deptno ORDER BY sal) rank1,
+DENSE_RANK() OVER(PARTITION BY deptno ORDER BY sal) dense_rank1,
+ROW_NUMBER() OVER(PARTITION BY deptno ORDER BY sal) row_number1,
+RANK() OVER(PARTITION BY deptno ORDER BY sal, empno) rank2, 
+DENSE_RANK() OVER(PARTITION BY deptno ORDER BY sal, empno) dense_rank2,  
+ROW_NUMBER() OVER(PARTITION BY deptno ORDER BY sal, empno) row_number2
+FROM emp WHERE deptno IN ('10', '20') ORDER BY deptno, sal, empno;
+
+-- sum() over : 누계 구하기
+-- panmae 테이블을 조회하여 1000번 대리점의 판매 내역을 판매일자, 제품코드 , 판매량, 누적 판매금액별로 출력
+SELECT p_date, p_code, p_qty, p_total, 
+SUM(p_total) OVER(ORDER BY p_total) "TOTAL" FROM panmae WHERE p_store = 1000;
+-- panmae 테이블을 조회하여 1000번 대리점의 판매 내역을 제품 코드별로 분류 후 판매일자, 제품코드 , 판매량, 누적 판매금액을 출력
+SELECT p_date, p_code, p_qty, p_total, 
+SUM(p_total) OVER(PARTITION BY p_code ORDER BY p_total) "TOTAL" FROM panmae WHERE p_store = 1000;
+-- panmae 테이블을 조회하여 제품코드, 판매점, 판매날짜, 판매량, 판매금액과 판매점별로 누적 판매금액 구하기
+SELECT p_code, P_store, p_date, p_qty, p_total, 
+SUM(p_total) OVER(PARTITION BY p_code, p_store ORDER BY p_date) "TOTAL" FROM panmae;
+
+-- ratio_to_report : 비율 구하는 함수
+-- panmae 테이블에서 100번 제품의 판매 내역과 각 판매점별로 판매 비중 구하기
+SELECT p_code, SUM(SUM(p_qty)) OVER() "TOTAL_QTY",
+SUM(SUM(p_total)) OVER() "TOTAL_PRICE", p_store, p_qty, p_total, 
+ROUND((RATIO_TO_REPORT(SUM(p_qty)) OVER())*100, 2) "qty_%",
+ROUND((RATIO_TO_REPORT(SUM(p_total)) OVER())*100, 2) "total_%"
+FROM panmae WHERE p_code = 100 GROUP BY p_code, p_store, p_qty, p_total;
+
+-- lag를 활용해 차이 구하기
+-- 1000번 판매점의 일자별 판매 내역과 금액 및 전일 판매 수량과 금액 차이 구하기
+SELECT p_store, p_date, p_code, p_qty, 
+LAG(p_qty, 1) OVER(ORDER BY p_date) "d-1 qty", 
+p_qty - LAG(p_qty, 1) OVER(ORDER BY p_date) "diff-qty", 
+p_total, 
+LAG(p_total, 1) OVER(ORDER BY p_date) "d-1 price", 
+p_total - LAG(p_total, 1) OVER(ORDER BY p_date) "diff-price"
+FROM panmae WHERE p_store = 1000;
+-- 모든 판매점을 판매점별(partition by)로 구분해서 전부 출력
+SELECT p_store, p_date, p_code, p_qty, 
+LAG(p_qty, 1) OVER(PARTITION BY p_store ORDER BY p_date) "d-1 qty", 
+p_qty - LAG(p_qty, 1) OVER(PARTITION BY p_store ORDER BY p_date) "diff-qty", 
+p_total, 
+LAG(p_total, 1) OVER(PARTITION BY p_store ORDER BY p_date) "d-1 price", 
+p_total - LAG(p_total, 1) OVER(PARTITION BY p_store ORDER BY p_date) "diff-price"
+FROM panmae;
 
 commit;
