@@ -7,14 +7,13 @@ max : 입력되는 데이터 중 가장 큰 값을 출력 max(sal)
 min : 입력되는 데이터 중 가장 작은 값을 출력 min(sal)
 stddev : 입력되는 데이터 값들의 표준 편차값을 출력 stddev(sal)
 variance : 입력되는 데이터 값들의 분산값을 출력 variance(sal)
-rollup : 입력되는 데이터의 소계값을 자동으로 계산해서 출력
+rollup : 입력되는 데이터의 열에 대한 소계값을 자동으로 계산해서 출력
 groupingset : 한 번의 쿼리로 여러 개의 함수들을 그룹으로 수행 가능
 listagg, pivot, lag, lead, rank, dense_rank
 */
 -- count : 입력되는 총 건수를 출력
 SELECT COUNT(*), COUNT(comm) FROM emp;
 -- sum : 입력된 데이터들의 합계 값을 출력
-SET null --null-- ;
 SELECT COUNT(comm), SUM(comm) FROM emp;
 -- avg : 입력된 데이터들의 평균 값을 출력
 SELECT COUNT(comm), SUM(comm), AVG(comm) FROM emp;
