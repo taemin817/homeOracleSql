@@ -57,3 +57,83 @@ SELECT deptno,
 FROM emp
       -- rollup(deptno) : 부서별(컬럼) 합계
 GROUP BY ROLLUP(deptno) ORDER BY deptno;
+DELETE FROM emp WHERE ename IN ('Tiger','Cat');
+/*
+emp 테이블을 조회하여 직원들의 급여와 전체 급여의 누적 급여금액을 출력하라. 단, 급여를 오름차순으로 정렬.
+                                        sum() over
+*/
+SELECT deptno, ename, sal, SUM(sal) OVER(ORDER BY sal) TOTAL FROM emp;
+
+/*
+fruit 테이블을 출력하라.
+*/
+SELECT SUM(DECODE(name, 'apple', price)) APPLE, 
+       SUM(DECODE(name, 'grape', price)) GRAPE, 
+       SUM(DECODE(name, 'orange', price)) ORANGE
+FROM fruit;
+
+/*
+student 테이블의 tel 컬럼을 사용해 지역별 인원수와 전체 대비 차지하는 비율을 출력하라.
+단, 02-SEOUL, 031-GYEONGGI, 051-BUSAN, 052-ULSAN, 053-DAEGU, 055-GYEONGNAM으로
+*/
+SELECT * FROM student;
+SELECT
+      COUNT(tel) || 'EA (' || ROUND(COUNT(tel) * 100 / COUNT(tel) , 0) || '%)' AS TOTAL,
+      COUNT(DECODE(SUBSTR(tel, 0, INSTR(tel, ')') - 1), '02', 0)) || 'EA (' ||
+            ROUND(COUNT(DECODE(SUBSTR(tel, 0, INSTR(tel, ')') - 1), '02', 0)) * 100 / COUNT(tel) , 0) || '%)' AS SEOUL,
+      COUNT(DECODE(SUBSTR(tel, 0, INSTR(tel, ')') - 1), '031', 0)) || 'EA (' ||
+            ROUND(COUNT(DECODE(SUBSTR(tel, 0, INSTR(tel, ')') - 1), '031', 0)) * 100 / COUNT(tel) , 0) || '%)' AS GYEONGGI,
+      COUNT(DECODE(SUBSTR(tel, 0, INSTR(tel, ')') - 1), '051', 0)) || 'EA (' ||
+            ROUND(COUNT(DECODE(SUBSTR(tel, 0, INSTR(tel, ')') - 1), '051', 0)) * 100 / COUNT(tel) , 0) || '%)' AS BUSAN,
+      COUNT(DECODE(SUBSTR(tel, 0, INSTR(tel, ')') - 1), '052', 0)) || 'EA (' ||
+            ROUND(COUNT(DECODE(SUBSTR(tel, 0, INSTR(tel, ')') - 1), '052', 0)) * 100 / COUNT(tel) , 0) || '%)' AS ULSAN,
+      COUNT(DECODE(SUBSTR(tel, 0, INSTR(tel, ')') - 1), '053', 0)) || 'EA (' ||
+            ROUND(COUNT(DECODE(SUBSTR(tel, 0, INSTR(tel, ')') - 1), '053', 0)) * 100 / COUNT(tel) , 0) || '%)' AS DAEGU,
+      COUNT(DECODE(SUBSTR(tel, 0, INSTR(tel, ')') - 1), '055', 0)) || 'EA (' ||
+            ROUND(COUNT(DECODE(SUBSTR(tel, 0, INSTR(tel, ')') - 1), '055', 0)) * 100 / COUNT(tel) , 0) || '%)' AS GYEONGNAM
+FROM student;
+
+/*
+emp 테이블을 조회하여 부서별로 급여 누적 합계를 출력하라. 단, 부서 번호로 오름차순으로
+*/
+SELECT deptno, ename, sal, SUM(sal) OVER(PARTITION BY deptno ORDER BY sal) TOTAL FROM emp;
+
+/*
+emp 테이블을 조회하여 전체 직원 급여 총액에서 각 사원의 급여액의 비율을 출력하라. 단, 급여비중을 내림차순으로
+*/
+SELECT deptno, ename, sal, 
+    SUM(sal) OVER() TOTAL_SAL, 
+    ROUND(RATIO_TO_REPORT(SUM(sal)) OVER()*100, 2) "%" 
+FROM emp GROUP BY deptno, ename, sal ORDER BY sal desc;
+
+/*
+emp 테이블을 조회하여 부서 급여 총액에서 각 사원들의 급여액 비율을 출력하라. 단, 부서 번호 오름차순으로
+*/
+SELECT deptno, ename, sal, 
+    SUM(sal) OVER(PARTITION BY deptno) SUM_DEPT, 
+    ROUND(RATIO_TO_REPORT(SUM(sal)) OVER(PARTITION BY deptno)*100, 2) "%" 
+FROM emp GROUP BY deptno, ename, sal;
+
+/*
+loan 테이블을 조회하여 1000번 지점의 대출 내역을 대출일자, 대출종목코드, 대출건수, 대출총액, 누적대출금액을 출력하라
+*/
+SELECT * FROM loan;
+SELECT l_date 대출일자, l_code 대출종목코드, l_qty 대출건수, l_total 대출총액, 
+    SUM(l_total) OVER(ORDER BY l_date) 누적대출금액 FROM loan WHERE l_store = 1000;
+
+/*
+loan 테이블을 조회하여 전체 지점의 대출종목코드, 대출지점, 대출일자, 대출건수, 대출액과 대출코드와 대출지점별 누적 합계를 출력하라
+*/
+SELECT l_code 대출종목코드, l_store 대출지점, l_date 대출일자, l_qty 대출건수, l_total 대출액,
+    SUM(l_total) OVER(PARTITION BY l_code, l_store ORDER BY l_date) 누적대출금액 FROM loan;
+
+/*
+loan 테이블을 조회하여 1000번 지점의 대출내역을 대출종목코드별로 합쳐서 대출일자, 코드, 대출건수, 대출총액, 누적대출금액을 출력하라
+*/
+SELECT l_date 대출일자, l_code 대출종목코드,  l_qty 대출건수, l_total 대출액,
+    SUM(l_total) OVER(PARTITION BY l_code ORDER BY l_qty) 누적대출금액 FROM loan WHERE l_store = 1000;
+
+
+
+
+commit;

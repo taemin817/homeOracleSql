@@ -279,7 +279,7 @@ DENSE_RANK() OVER(PARTITION BY deptno ORDER BY sal, empno) dense_rank2,
 ROW_NUMBER() OVER(PARTITION BY deptno ORDER BY sal, empno) row_number2
 FROM emp WHERE deptno IN ('10', '20') ORDER BY deptno, sal, empno;
 
--- sum() over : 누계 구하기
+-- sum() over : 전체/특정 데이터 집합에 대한 합계를 계산
 -- panmae 테이블을 조회하여 1000번 대리점의 판매 내역을 판매일자, 제품코드 , 판매량, 누적 판매금액별로 출력
 SELECT p_date, p_code, p_qty, p_total, 
 SUM(p_total) OVER(ORDER BY p_total) "TOTAL" FROM panmae WHERE p_store = 1000;
@@ -290,7 +290,7 @@ SUM(p_total) OVER(PARTITION BY p_code ORDER BY p_total) "TOTAL" FROM panmae WHER
 SELECT p_code, P_store, p_date, p_qty, p_total, 
 SUM(p_total) OVER(PARTITION BY p_code, p_store ORDER BY p_date) "TOTAL" FROM panmae;
 
--- ratio_to_report : 비율 구하는 함수
+-- ratio_to_report : 각 행에서 해당 값이 전체 합에 대한 비율을 계산
 -- panmae 테이블에서 100번 제품의 판매 내역과 각 판매점별로 판매 비중 구하기
 SELECT p_code, SUM(SUM(p_qty)) OVER() "TOTAL_QTY",
 SUM(SUM(p_total)) OVER() "TOTAL_PRICE", p_store, p_qty, p_total, 
