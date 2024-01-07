@@ -133,7 +133,19 @@ loan 테이블을 조회하여 1000번 지점의 대출내역을 대출종목코드별로 합쳐서 대출일자
 SELECT l_date 대출일자, l_code 대출종목코드,  l_qty 대출건수, l_total 대출액,
     SUM(l_total) OVER(PARTITION BY l_code ORDER BY l_qty) 누적대출금액 FROM loan WHERE l_store = 1000;
 
+/*
+professor 테이블에서 각 교수들의 급여를 구하고 그 급여액이 전채 교수의 급여 합계에서 차지하는 비율을 출력하라
+*/
+SELECT * FROM professor;
+SELECT deptno, name, pay, SUM(pay) OVER() "TOTAL PAY", ROUND(RATIO_TO_REPORT(SUM(PAY)) OVER()*100, 2) "RATIO %"
+FROM professor GROUP BY deptno, name, pay ORDER BY pay DESC;
 
+/*
+professor 테이블을 조회하여 학과번호, 교수명, 급여, 학과별 급여 합계를 구하고 각 교수의 급여가 해당 학과별 급여 합계에서 차지하는 비율을 출력하라
+*/
+SELECT deptno, name, pay, SUM(PAY) OVER(PARTITION BY deptno) TOTAL_DEPTNO, 
+    ROUND(RATIO_TO_REPORT(SUM(PAY)) OVER(PARTITION BY deptno)*100, 2) "RATIO %"
+FROM professor GROUP BY deptno, name, pay;
 
 
 commit;
