@@ -251,7 +251,7 @@ FROM emp e, emp e2 WHERE e.hiredate > e2.hiredate (+)
 GROUP BY e.empno, e.ename, e.hiredate ORDER BY 4;
 -- ANSI Join
 SELECT e.empno EMPNO, e.ename ENAME, TO_CHAR(e.hiredate, 'YY/MM/DD') HIREDATE, COUNT(e2.hiredate) COUNT 
-FROM emp e LEFT OUTER JOIN emp e2 ON e.hiredate > e2.hiredate (+) 
+FROM emp e LEFT OUTER JOIN emp e2 ON e.hiredate > e2.hiredate
 GROUP BY e.empno, e.ename, e.hiredate ORDER BY 4;
 
 commit;
