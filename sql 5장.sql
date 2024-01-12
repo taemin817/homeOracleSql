@@ -106,4 +106,64 @@ select * from dept7;
 -- DROP : 오브젝트 자체를 삭제
 DROP TABLE dept7;
 
+-- 읽기 전용 테이블로 변경하기
+CREATE TABLE t_readonly (no NUMBER, name VARCHAR2(10));
+INSERT INTO t_readonly VALUES(1, 'AAA');
+commit;
+SELECT * FROM t_readonly;
+ALTER TABLE t_readonly read only;
+-- 데이터 추가 시도
+INSERT INTO t_readonly VALUES(2, 'BBB');
+-- 컬럼 추가 시도
+ALTER TABLE t_readonly ADD (tel NUMBER DEFAULT 111);
+-- 읽기 전용 모드를 변경
+ALTER TABLE t_readonly read write;
+DROP TABLE t_readonly;
+
+-- 가상 컬럼 테이블 사용하기
+-- 가상 컬럼을 가지는 vt1 테이블 생성
+--                                          col3은 col1+col2의 결과로 자동생성됨
+CREATE TABLE vt1 (col1 NUMBER, col2 NUMBER, col3 NUMBER GENERATED ALWAYS AS (col1+col2));
+INSERT INTO vt1 VALUES(1, 2, 3); -- col3는 1,2번째 컬럼의 합으로 자동생성되는 컬럼이라 데이터 입력불가
+INSERT INTO vt1 (col1, col2) VALUES(1, 2);
+select * from vt1;
+UPDATE vt1 SET col1=5;
+select * from vt1;
+-- 새로운 가상 컬럼 추가
+ALTER TABLE vt1 ADD (col4 NUMBER GENERATED ALWAYS AS ((col1*12)+col2));
+select * from vt1;
+-- 가상 컬럼 내역 조회
+SET LINE 200
+COL column_name FOR a10
+COL data_type FOR a10
+COL data_default FOR a25
+SELECT column_name, data_type, data_default FROM user_tab_columns 
+WHERE table_name = 'VT1' ORDER BY column_id;
+
+-- 조건절을 활용한 가상 컬럼 생성하기
+CREATE TABLE sales10 (no NUMBER, pcode CHAR(4), pdate CHAR(8), pqty NUMBER, pbungi NUMBER(1) GENERATED ALWAYS AS 
+(CASE WHEN SUBSTR(pdate, 5, 2) IN ('01', '02', '03') THEN 1
+     WHEN SUBSTR(pdate, 5, 2) IN ('04', '05', '06') THEN 2
+     WHEN SUBSTR(pdate, 5, 2) IN ('07', '08', '09') THEN 3
+     ELSE 4 END) 
+     virtual);
+INSERT INTO sales10(no, pcode, pdate, pqty) VALUES (1, '100', '20110112', 10);
+INSERT INTO sales10(no, pcode, pdate, pqty) VALUES (2, '200', '20110505', 20);
+INSERT INTO sales10(no, pcode, pdate, pqty) VALUES (3, '300', '20110812', 30);
+INSERT INTO sales10(no, pcode, pdate, pqty) VALUES (4, '400', '20111024', 40);
+commit;
+select * from sales10;
+
+
+
+
+
+
+
+
+
+
+
+
+
 commit;
