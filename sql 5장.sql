@@ -154,16 +154,86 @@ INSERT INTO sales10(no, pcode, pdate, pqty) VALUES (4, '400', '20111024', 40);
 commit;
 select * from sales10;
 
+-- Data Dictionary(데이터 딕셔너리) : DB를 운영하기 위한 정보들을 모두 모아두고 관리하는 테이블
+/*
+오라클 DB의 메모리 구조와 파일에 대한 구조 정보
+각 오브젝트들이 사용하고 있는 공간 정보
+제약 조건 정보
+사용자에 대한 정보
+권한이나 프로파일, 롤에 대한 정보
+감사(Audit)에 대한 정보
 
+이 정보들은 만약 장애나 잘못 관리도리 경우 오라클 디비를 사용할 수 없고 더 심할 경우 아예 복구불가하기 때문에
+이 딕셔너리를 base table과 data dictionary view로 나누고 base table은 dba도 접근을 못하게 막아둠
+view를 통해서만 딕셔너리를 select할 수 있게 허용, 만약 변경해야할 경우 해당 ddl문장을 수행하는 순간 server process가 대신 변경해줌
+*/
 
+-- base table : db를 생성하는 시점에 자동으로 만들어짐
+/*
+data dictionary view : catalog.sql 파일이 수행되어야만 만들어짐. 2종류가 존재 
+1. static data dictionary view : V$_ 라는 접두어가 붙음
+2. dynamic data dictionary view : DBA_, ALL_, USER_ 라는 접두어가 붙은 3가지로 나눠짐
+2-1. USER_ : 해당 사용자가 생성한 오브젝트들만 조회할 수 있음
+2-2. DBA_ : DB 내의 거의 모든 오브젝트들을 DBA 권한을 가진 사람만 조회 가능
+*/
 
+-- 연습용 테이블 생성하고 데이터 입력
+CREATE TABLE st_table (no NUMBER);
+/*
+BEGIN
+    FOR i in 1..1000 LOOP
+        INSERT INTO st_table VALUES(i);
+        END LOOP;
+    COMMIT;
+END;
+*/
+-- 데이터 딕셔너리를 조회하여 해당 테이블에 데이터가 몇 건 있는지 확인
+select * from st_table;
+SELECT COUNT(*) FROM st_table;
+SELECT num_rows, blocks FROM user_tables WHERE table_name = 'ST_TABLE';
+-- 딕셔너리인 user_table을 조회하니 st_table에 데이터가 한건도 없는 것으로 조회
+-- 실제 데이터는 1000건 있지만 딕셔너리 내용이 변경되지않아 딕셔너리는 이 사실을 모르는 것
 
+-- 딕셔너리를 관리자가 수동으로 업데이트한 후 다시 조회
+ANALYZE TABLE st_table COMPUTE STATISTICS;
+-- ANALYZE : 실제 테이블이나 인덱스, 클러스터 등을 하나씩 조사하여 그 결과를 딕셔너리에 반영시킴
+SELECT num_rows, blocks FROM user_tables WHERE table_name = 'ST_TABLE';
 
+-- p.285 연습문제
+-- 1. new_emp 테이블 생성하라
+CREATE TABLE new_emp (no NUMBER(5), name VARCHAR2(20), hiredate DATE, bonus NUMBER(6, 2));
+select * from new_emp;
 
+-- 2. 위에서 생성한 테이블에서 no, name, hiredate만 가져와 new_emp2 테이블을 생성하라
+CREATE TABLE new_emp2 AS SELECT no, name, hiredate FROM new_emp;
+select * from new_emp2;
 
+-- 3. 위에서 생성한 테이블과 동일한 구조만 가져오는 new_emp3 테이블을 생성하라
+CREATE TABLE new_emp3 AS SELECT * FROM new_emp2 WHERE 1= 2;
+select * from new_emp3;
 
+-- 4. new_emp2 테이블에 DATE타입을 가진 birthday 컬럼을 추가하라. 단, 컬럼이 추가될 때 기본값은 sysdate를 자동입력
+ALTER TABLE new_emp2 ADD(birthday DATE DEFAULT sysdate);
+INSERT INTO new_emp2 (no, name, hiredate) VALUES(001, 'VARCHAR2(20)', '1992/08/17');
+select * from new_emp2;
 
+-- 5. new_emp2 테이블의 birthday 컬럼 이름을 birth로 변경하라
+ALTER TABLE new_emp2 RENAME COLUMN birthday TO birth;
+select * from new_emp2;
 
+-- 6. new_emp2 테이블의 no 컬럼 길이를 7로 변경하라
+ALTER TABLE new_emp2 MODIFY(no NUMBER(7));
+
+-- 7. new_emp2 테이블의 birth 컬럼을 삭제하라
+ALTER TABLE new_emp2 DROP COLUMN birth;
+select * from new_emp2;
+
+-- 8. new_emp2 테이블의 컬럼만 남기고 데이터만 삭제하라
+TRUNCATE TABLE new_emp2;
+select * from new_emp2;
+
+-- 8. new_emp2 테이블 자체를 삭제하라
+DROP TABLE new_emp2;
 
 
 commit;
