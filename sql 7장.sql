@@ -1,0 +1,1 @@
+-- CONSTRAINT(제약 조건)

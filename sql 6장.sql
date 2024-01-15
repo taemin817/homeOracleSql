@@ -184,62 +184,122 @@ UPDATE DEPT_HIST d SET d.deptno = (
 WHERE EXISTS(
     SELECT 1 FROM emp e WHERE e.empno = d.empno);
 select * from DEPT_HIST;
+-- emp 테이블을 두 번 읽는 구조가 되어버린다
+-- WHERE절에서 이 UPDATE 대상 범위를 지정하지 않으면 조인되지 않은 대상은 NULL로 UPDATE됨 
 
+-- 오라클에서는 비교 테이블을 한 번만 읽는 방법으로 UPDATE JOIN VIEW와 MERGE를 제공, 보통은 MERGE 사용
+MERGE INTO DEPT_HIST d USING emp e ON (e.empno = d.empno)
+WHEN MATCHED THEN UPDATE SET d.deptno = e.deptno;
+commit;
+select * from dept_hist;
 
+-- TRANSACTION(논리적인 작업 단위, DML 작업들을 하나의 단위로 묶어둔 것) 관리하기
+/*
+해당 트랜잭션 내에 있는 모든 DML이 성공해야 해당 트랜잭션이 성공함, 하나라도 실패하면 전체가 실패
+트랜잭션의 시작은 DML이고 완려하려면 TCL, DCL, DDL을 입력하면 됨
+commit : 트랜잭션 내의 작업의 결과를 확정하는 명령어
+rollback : 트랜잭션 내의 모든 명령어를 취소하는 명령어
+DML을 작업한 후에는 반드시 COMMIT/ROLLBACK 명령을 수행해야 작업이 마무리 됨
+*/
 
+-- DELETE로 삭제 후 테이블 용량 확인
+-- 테스트용 테이블을 생성하고 대량의 데이터를 입력
+ALTER DATABASE DATAFILE 'C:\neworacle\oradata\TESTDB\UNDOTBS01.DBF' autoextend on;
 
+CREATE TABLE scott.reorg (no NUMBER, name VARCHAR2(20), addr VARCHAR2(20));
 
+BEGIN
+    FOR i IN 1..500000 LOOP 
+        INSERT INTO scott.reorg
+        VALUES (i, DBMS_RANDOM.STRING('B', 19), DBMS_RANDOM.STRING('H', 19));
+    END LOOP;
+    COMMIT;
+END;
 
+SELECT COUNT(*) FROM scott.reorg;
 
+-- 테이블 크기를 측정
+ANALYZE TABLE scott.reorg COMPUTE STATISTICS;
 
+SELECT SUM(BYTES)/1024/1024 MB 
+FROM dba_segments 
+WHERE owner='SCOTT' 
+AND segment_name='REORG'; -- 용량 28mb
 
+SELECT table_name, num_rows, blocks, empty_blocks 
+FROM dba_tables
+WHERE owner='SCOTT' 
+AND table_name='REORG';
+-- num_rows : 데이터 건수, blocks : 사용 중인 block의 개수, empty_blocks : 빈 블록 개수
 
+SELECT COUNT(DISTINCT DBMS_ROWID.ROWID_BLOCK_NUMBER(rowid)||DBMS_ROWID.ROWID_RELATIVE_FNO(rowid)) "REAL USED"
+FROM scott.reorg;
 
+-- 데이터 삭제 후 테이블 크기 확인
+DELETE FROM scott.reorg;
+commit;
+select count(*) from scott.reorg; -- 데이터가 없음을 확인
 
+SELECT SUM(BYTES)/1024/1024 MB 
+FROM dba_segments 
+WHERE owner='SCOTT' 
+AND segment_name='REORG'; -- 용량은 그대로 28mb
 
+SELECT COUNT(DISTINCT DBMS_ROWID.ROWID_BLOCK_NUMBER(rowid)||DBMS_ROWID.ROWID_RELATIVE_FNO(rowid)) "REAL USED"
+FROM scott.reorg; -- 실제 사용하는 블럭은 0
 
+-- 용량까지 줄이고 싶으면 reorg 작업을 별도로 해야함
+-- DELETE 후 TABLE REORG(재구성) 하기
+-- reorg 테이블에 데이터 추가
+BEGIN
+    FOR i IN 1..50000 LOOP 
+        INSERT INTO scott.reorg
+        VALUES (i, DBMS_RANDOM.STRING('B', 19), DBMS_RANDOM.STRING('H', 19));
+    END LOOP;
+    COMMIT;
+END;
+-- reorg 테이블에서 데이터 10000건 삭제
+DELETE FROM scott.reorg WHERE no BETWEEN 1 AND 10000;
+commit;
 
+SELECT COUNT(*) FROM scott.reorg;
+SELECT SUM(BYTES)/1024/1024 MB 
+FROM dba_segments 
+WHERE owner='SCOTT' 
+AND segment_name='REORG';
 
+-- 테이블 reorg(리오그-재구성) 작업 실행 : 테이블 스페이스를 이동시키는 방법 사용
+SELECT table_name, tablespace_name FROM dba_tables WHERE table_name='REORG'; -- 현재 EXAMPLE 테이블 스페이스에 위치
+ALTER TABLE scott.reorg MOVE TABLESPACE EXAMPLE;
 
+SELECT SUM(BYTES)/1024/1024 MB 
+FROM dba_segments 
+WHERE owner='SCOTT' 
+AND segment_name='REORG'; -- 용량이 3MB로 줄어든 것을 확인할 수 있음
+select count(*) from scott.reorg; -- 데이터는 5000에서 1000을 제한 4000이 남음
 
+-- p.321 연습문제
+-- dept2 테이블에 새로운 부서 정보를 입력하라
+-- deptno : 9010, dname : temp_10, pdept : 1006, area : temp area
+select * from dept2;
+INSERT INTO dept2 VALUES(9010, 'temp_10', 1006, 'temp area');
 
+-- dept2 테이블에 특정 컬럼에만 정보를 입력하라
+INSERT INTO dept2(dcode, dname, pdept) VALUES(9020, 'temp_20', 1006);
+select * from dept2;
 
+/*
+professor 테이블에서 profno가 3000번 이하의 교수들의 profno, name, pay를 가져와서 
+professor4 테이블에 한꺼번에 입력하는 쿼리를 사용하라(ITAS 방법 사용)
+*/
+SELECT profno, name, pay FROM professor WHERE profno <= 30000;
+INSERT INTO professor4 SELECT profno, name, pay FROM professor WHERE profno <= 30000;
+select * from professor4;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+-- professor 테이블에서 Sharon Stone 교수의 bonus를 100 추가하라
+SELECT * FROM professor WHERE name='Sharon Stone';
+UPDATE professor SET bonus = bonus+100 WHERE name='Sharon Stone';
+commit;
 
 
 
