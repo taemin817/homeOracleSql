@@ -88,4 +88,123 @@ ex. emp 테이블에서 사원이 많아도 deptno 컬럼의 종류는 적을 경우 BITMAP INDEX가 �
 CREATE BITMAP INDEX 인덱스명 ON 테이블명(컬럼명);
 */
 
+
+-- 인덱스 주의사항
+/*
+dml에 취약함
+dml과 인덱스는 사이가 좋지 않기 때문에 dml이 발생하는 테이블은 인덱스를 최소한 작게 만들어야 함
+                                                인덱스의 block이 하나에서 두개로 나눠지는 현상
+인덱스가 생성되어 있는 컬럼에 새로운 데이터가 insert되면 index split현상이 발생하여 insert작업 부하 상승
+index split은 사용자가 아니라 오라클이 자동으로 진행하지만 index split이 완료되기 전까지
+다음 데이터가 입력되지 않고 계속 진행 중인 상태로 대기 중 -> 데이터 입력, 변경 시에 속도가 느려짐
+*/
+
+/*
+insert 작업 시 인덱스는 정렬되어있기 때문에 마지막에 들어갈 수 없고 빈자리가 있다면 상관없지만
+빈자리가 없을 경우 새로운 블록을 생성하여 기존 블록의 절반 정도를 옮기고
+기존 블록에 남는 자리에 새로 insert하는 index split 현상이 발생함
+*/
+/*
+테이블은 데이터가 delete되면 지워지고 다른 데이터가 그 공간을 사용할 수 있지만 index는 사용불가 표시가 뜸->인덱스가 누적된다
+이런 상태의 인덱스를 사용하게 되면 인덱스를 사용함에도 쿼리의 수행 속도가 아주 느려지게 됨 -> index rebuild해야 함
+*/
+/*
+인덱스에는 update가 없음
+*/
+
+-- 인덱스 관리
+-- 조회
+-- 특정 사용자가 생성한 인덱스 조회 : user_indexes, user_ind_columns
+set line 200
+col table_name for a10
+col column_name for a10
+col index_name for a20
+SELECT table_name, column_name, index_name FROM user_ind_columns WHERE table_name = 'EMP2';
+-- db 전체에 생성된 인덱스 조회 : dba_indexes, dba_ind_columns
+SELECT table_name, index_name FROM user_indexes WHERE table_name = 'DEPT2';
+
+-- 사용여부 모니터링
+-- emp 테이블 ename 컬럼에 IDX_EMP_ENAME 인덱스가 있다고 가정
+-- 모니터링 시작
+ALTER INDEX IDX_EMP_ENAME MONITORING USAGE;
+-- 모니터링 중단
+ALTER INDEX IDX_EMP_ENAME NOMONITORING USAGE;
+-- 사용 유무 확인(자신이 만든 인덱스만)
+SELECT index_name, used FROM v$object_usage WHERE index_name = 'IDX_EMP_ENAME';
+-- sys 계정으로 모든 인덱스의 사용 유무를 조회하고 싶으면 별도의 뷰를 생성하여 조회
+create or replace view v$all_index_usage(
+    index_name, table_name, owner_name, monitoring, used, start_monitoring, end_monitoring) as
+        select a.name, b.name, e.name,
+               decode(bitAND(c.flags, 65536), 0, 'NO', 'YES'),
+               decode(bitAND(d.flags, 1), 0, 'NO', 'YES'),
+               d.start_monitoring, d.end_monitoring
+        from sys.obj$ a, sys.obj$ b, sys.ind$ c, sys.user$ e, sys.object_usage d
+        where c.obj# = d.obj# and a.obj# = d.obj# and b.obj# = c.bo# and e.user# = a.owner#;
+
+select * from v$all_index_usage;
+
+-- scott 계정의 특정 인덱스를 조회해 모니터링 후 위에서 생성한 뷰를 다시 조회
+select table_name, index_name from dba_indexes WHERE table_name = 'PROFESSOR';
+alter index scott.SYS_C0011298 monitoring usage;
+
+col index_name for a15
+col table_name for a15
+col owner_name for a10
+col monitoring for a10
+col used for a5
+col start_monitoring for a20
+col end_monitoring for a20
+set line 200
+select * from v$all_index_usage;
+
+-- 인덱스 Rebuild 하기
+-- 대량의 dml 작업 등을 수행 후에는 일반적으로 인덱스의 밸런싱 상태를 조사하여 문제가 있을 경우 수정하는 작업을 진행
+
+-- 테스트용 테이블 idx_test를 생성하고 데이터를 입력 후 인덱스 생성
+CREATE TABLE idx_test (no NUMBER);
+
+BEGIN FOR i IN 1..10000 LOOP INSERT INTO idx_test VALUES(i);
+END LOOP;
+COMMIT;
+END;
+
+CREATE INDEX IDX_IDXTEST_NO ON idx_test(no);
+
+-- 인덱스의 상태를 조회
+analyze index idx_idxtest_no VALIDATE STRUCTURE;
+SELECT (del_lf_rows_len / lf_rows_len) * 100 BALANCE FROM index_stats WHERE name = 'IDX_IDXTEST_NO';
+
+-- 테이블에서 10000건의 데이터 중 4000건을 지운 후 인덱스 상태를 조회
+DELETE FROM idx_test WHERE no BETWEEN 1 AND 4000;
+SELECT COUNT(*) FROM idx_test;
+
+SELECT (del_lf_rows_len / lf_rows_len) * 100 BALANCE FROM index_stats WHERE name = 'IDX_IDXTEST_NO';
+analyze index idx_idxtest_no VALIDATE STRUCTURE;
+SELECT (del_lf_rows_len / lf_rows_len) * 100 BALANCE FROM index_stats WHERE name = 'IDX_IDXTEST_NO';
+-- -> 대략 40퍼센트 정도 밸런싱이 망가진 상태
+
+-- Rebuild 작업으로 수정
+ALTER INDEX idx_idxtest_no REBUILD;
+analyze index idx_idxtest_no VALIDATE STRUCTURE;
+SELECT (del_lf_rows_len / lf_rows_len) * 100 BALANCE FROM index_stats WHERE name = 'IDX_IDXTEST_NO';
+-- -> 다시 밸런싱이 0으로 개선됨
+
+-- Invisible Index : 인덱스를 삭제하기 전에 '사용 안함' 상태로 만들어 테스트 해볼 수 있는 기능
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 commit;
